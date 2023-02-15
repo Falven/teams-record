@@ -4,18 +4,7 @@ import styles from '../styles/index.module.css';
 export default function Index() {
   const videoRef = useRef(null);
   const aRef = useRef(null);
-  const logRef = useRef(null);
   const mediaRecorderRef = useRef(null);
-
-  const mediaBuffer = [];
-
-  function handleDataAvailable(event) {
-    console.log('data-available');
-    if (event.data.size > 0) {
-      mediaBuffer.push(event.data);
-      console.log(mediaBuffer);
-    }
-  }
 
   function dumpOptionsInfo() {
     const videoTrack = videoRef.current.srcObject.getVideoTracks()[0];
@@ -25,23 +14,30 @@ export default function Index() {
     console.info(JSON.stringify(videoTrack.getConstraints(), null, 2));
   }
 
+  function OnDataAvailable(event) {
+    const url = URL.createObjectURL(event.data);
+    aRef.current.href = url;
+    aRef.current.download = 'recording.webm';
+    aRef.current.click();
+
+    URL.revokeObjectURL(url);
+  }
+
   async function startCapture() {
-    logRef.innerHTML = '';
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
+      const mediaStream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           displaySurface: 'window',
         },
         audio: false,
       });
+      videoRef.current.srcObject = mediaStream;
 
-      mediaRecorderRef.current = new MediaRecorder(stream, {
+      mediaRecorderRef.current = new MediaRecorder(mediaStream, {
         mimeType: 'video/webm; codecs=vp9',
       });
-      mediaRecorderRef.current.ondataavailable = handleDataAvailable;
+      mediaRecorderRef.current.ondataavailable = OnDataAvailable;
       mediaRecorderRef.current.start();
-
-      videoRef.current.srcObject = stream;
 
       dumpOptionsInfo();
     } catch (err) {
@@ -49,21 +45,14 @@ export default function Index() {
     }
   }
 
-  function stopCapture(evt) {
-    let tracks = videoRef.current.srcObject.getTracks();
+  function stopCapture() {
+    mediaRecorderRef.current.stop();
+
+    const tracks = videoRef.current.srcObject.getTracks();
     if (tracks) {
       tracks.forEach(track => track.stop());
     }
     videoRef.current.srcObject = null;
-
-    const blob = new Blob(mediaBuffer, {
-      type: 'video/webm',
-    });
-    const url = URL.createObjectURL(blob);
-    aRef.current.href = url;
-    aRef.current.download = 'test.webm';
-    aRef.current.click();
-    URL.revokeObjectURL(url);
   }
 
   return (
